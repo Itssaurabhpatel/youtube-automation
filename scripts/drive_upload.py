@@ -14,6 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(ROOT, "scripts"))
 
 from youtube_upload import upload_local_file
+from thumbnail_generator import create_video_thumbnail
 
 def load_config() -> dict:
     cfg_path = os.path.join(ROOT, "config.json")
@@ -178,6 +179,16 @@ def process_and_upload_drive_video(drive_url: str, privacy: str = "private"):
             print(f"Description:\n{metadata['description'][:200]}...")
             print("-------------------------------\n")
 
+            # Generate Custom Hindi Thumbnail (16:9, 1280x720)
+            out_dir = os.path.join(ROOT, "output")
+            os.makedirs(out_dir, exist_ok=True)
+            thumb_path = os.path.join(out_dir, f"thumb_{os.path.basename(video_path)}.jpg")
+            create_video_thumbnail(
+                topic_or_title=f"{metadata.get('title', '')}\n{metadata.get('description', '')}",
+                output_path=thumb_path,
+                preferred_style="auto"
+            )
+
             # Upload to YouTube
             tags = metadata.get("tags", []) + cfg.get("default_tags", [])
             category = cfg.get("category_id", "27")
@@ -189,7 +200,8 @@ def process_and_upload_drive_video(drive_url: str, privacy: str = "private"):
                 description=metadata["description"],
                 tags=tags,
                 privacy=upload_privacy,
-                category=category
+                category=category,
+                thumbnail_path=thumb_path
             )
             print(f"🎉 UPLOAD SUCCESS: https://www.youtube.com/watch?v={vid}")
 

@@ -36,6 +36,15 @@ on:
         required: false
         type: string
         default: ""
+      thumbnail_style:
+        description: "Thumbnail Style (1: Bold Hindi News Maroon, 2: High-Contrast Farming Tips Yellow)"
+        required: true
+        type: choice
+        options:
+          - auto
+          - "1"
+          - "2"
+        default: auto
       privacy:
         description: "YouTube Privacy"
         required: true
@@ -86,12 +95,13 @@ jobs:
             --intro-url "${{ inputs.intro_url }}" \
             --watermark-mode "${{ inputs.watermark_mode || 'cover_badge' }}" \
             --logo-url "${{ inputs.logo_url }}" \
+            --thumbnail-style "${{ inputs.thumbnail_style || 'auto' }}" \
             --privacy "${{ inputs.privacy || 'private' }}"
 
-      - name: Save Merged Video as Artifact
+      - name: Save Merged Video and Thumbnail as Artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: final-merged-video
-          path: output/*.mp4
+          name: final-video-and-thumbnail
+          path: output/*.*
           retention-days: 7

@@ -10,7 +10,23 @@ from googleapiclient.http import MediaFileUpload
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
-def upload_local_file(video_path: str, title: str, description: str, tags: list, privacy: str = "private", category: str = "27") -> str:
+def set_video_thumbnail(youtube, video_id: str, thumbnail_path: str):
+    """Uploads custom thumbnail to YouTube for the uploaded video."""
+    if not thumbnail_path or not os.path.exists(thumbnail_path):
+        return
+    print(f"[YouTube API] Uploading custom thumbnail: {thumbnail_path}...")
+    try:
+        req = youtube.thumbnails().set(
+            videoId=video_id,
+            media_body=MediaFileUpload(thumbnail_path, mimetype="image/jpeg")
+        )
+        req.execute()
+        print(f"[YouTube API] Custom thumbnail successfully attached to video: {video_id}!")
+    except Exception as e:
+        print(f"[YouTube API] Notice: Could not set custom thumbnail ({e}). "
+              "If your channel has not enabled custom thumbnails yet, verify your channel phone number in YouTube Studio.")
+
+def upload_local_file(video_path: str, title: str, description: str, tags: list, privacy: str = "private", category: str = "27", thumbnail_path: str = "") -> str:
     client_id = os.getenv("YT_CLIENT_ID")
     client_secret = os.getenv("YT_CLIENT_SECRET")
     refresh_token = os.getenv("YT_REFRESH_TOKEN")
@@ -50,6 +66,11 @@ def upload_local_file(video_path: str, title: str, description: str, tags: list,
     vid = response["id"]
     print(f"UPLOAD_SUCCESS privacy={privacy}")
     print(f"VIDEO_URL=https://www.youtube.com/watch?v={vid}")
+
+    # Set custom thumbnail if provided
+    if thumbnail_path and os.path.exists(thumbnail_path):
+        set_video_thumbnail(youtube, vid, thumbnail_path)
+
     return vid
 
 def main():

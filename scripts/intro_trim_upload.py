@@ -14,6 +14,7 @@ sys.path.append(os.path.join(ROOT, "scripts"))
 from youtube_upload import upload_local_file
 from drive_upload import get_video_info, generate_metadata_from_audio, load_config
 from watermark_handler import apply_watermark_removal
+from thumbnail_generator import create_video_thumbnail
 
 def has_audio_stream(file_path: str) -> bool:
     """Checks if video contains an audio stream using ffprobe."""
@@ -141,7 +142,8 @@ def process_trim_intro_upload(
     intro_url: str = "",
     privacy: str = "private",
     watermark_mode: str = "cover_badge",
-    logo_image_url: str = ""
+    logo_image_url: str = "",
+    thumbnail_style: str = "auto"
 ):
     cfg = load_config()
     print("=" * 60)
@@ -208,7 +210,16 @@ def process_trim_intro_upload(
         print(f"Description:\n{metadata['description'][:200]}...")
         print("-------------------------------\n")
 
-        # 7. Upload to YouTube
+        # 7. Generate High-Quality Hindi YouTube Thumbnail (16:9, 1280x720)
+        thumb_path = os.path.join(out_dir, f"thumb_{os.path.basename(main_video_file)}.jpg")
+        print("\n--- GENERATING CUSTOM HINDI THUMBNAIL (16:9) ---")
+        create_video_thumbnail(
+            topic_or_title=f"{metadata.get('title', '')}\n{metadata.get('description', '')}",
+            output_path=thumb_path,
+            preferred_style=thumbnail_style
+        )
+
+        # 8. Upload to YouTube
         tags = metadata.get("tags", []) + cfg.get("default_tags", [])
         category = cfg.get("category_id", "27")
         upload_privacy = privacy or cfg.get("upload_privacy", "private")
@@ -219,7 +230,8 @@ def process_trim_intro_upload(
             description=metadata["description"],
             tags=tags,
             privacy=upload_privacy,
-            category=category
+            category=category,
+            thumbnail_path=thumb_path
         )
         print("=" * 60)
         print(f"🎉 VIDEO LIVE ON YOUTUBE: https://www.youtube.com/watch?v={vid}")
@@ -233,6 +245,7 @@ if __name__ == "__main__":
     parser.add_argument("--intro-url", default="", help="Intro video Google Drive or Direct Link (optional if assets/intro.mp4 exists)")
     parser.add_argument("--watermark-mode", default="cover_badge", choices=["cover_badge", "delogo", "none"])
     parser.add_argument("--logo-url", default="", help="Custom logo/image URL to cover watermark")
+    parser.add_argument("--thumbnail-style", default="auto", choices=["auto", "1", "2"], help="Thumbnail style: 1 (News Maroon) or 2 (Education Yellow)")
     parser.add_argument("--privacy", default="private", choices=["private", "unlisted", "public"])
     args = parser.parse_args()
 
@@ -243,5 +256,6 @@ if __name__ == "__main__":
         intro_url=args.intro_url,
         privacy=args.privacy,
         watermark_mode=args.watermark_mode,
-        logo_image_url=args.logo_url
+        logo_image_url=args.logo_url,
+        thumbnail_style=args.thumbnail_style
     )
