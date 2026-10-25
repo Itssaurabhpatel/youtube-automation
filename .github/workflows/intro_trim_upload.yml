@@ -41,10 +41,15 @@ on:
         required: true
         type: choice
         options:
-          - auto
-          - "1"
-          - "2"
+            - auto
+            - "1"
+            - "2"
         default: auto
+      thumbnail_url:
+        description: "Custom Thumbnail Link (Optional: Google Drive link or direct URL. Leave empty for Auto-AI generation)"
+        required: false
+        type: string
+        default: ""
       privacy:
         description: "YouTube Privacy"
         required: true
@@ -96,6 +101,7 @@ jobs:
             --watermark-mode "${{ inputs.watermark_mode || 'cover_badge' }}" \
             --logo-url "${{ inputs.logo_url }}" \
             --thumbnail-style "${{ inputs.thumbnail_style || 'auto' }}" \
+            --thumbnail-url "${{ inputs.thumbnail_url }}" \
             --privacy "${{ inputs.privacy || 'private' }}"
 
       - name: Save Merged Video and Thumbnail as Artifact

@@ -143,7 +143,8 @@ def process_trim_intro_upload(
     privacy: str = "private",
     watermark_mode: str = "cover_badge",
     logo_image_url: str = "",
-    thumbnail_style: str = "auto"
+    thumbnail_style: str = "auto",
+    thumbnail_url: str = ""
 ):
     cfg = load_config()
     print("=" * 60)
@@ -210,15 +211,20 @@ def process_trim_intro_upload(
         print(f"Description:\n{metadata['description'][:200]}...")
         print("-------------------------------\n")
 
-        # 7. Generate High-Quality Hindi YouTube Thumbnail (16:9, 1280x720)
+        # 7. Generate or Use Custom Hindi YouTube Thumbnail (16:9, 1280x720)
         thumb_path = os.path.join(out_dir, f"thumb_{os.path.basename(main_video_file)}.jpg")
-        print("\n--- GENERATING CUSTOM HINDI THUMBNAIL (16:9) ---")
-        create_video_thumbnail(
-            topic_or_title=f"{metadata.get('title', '')}\n{metadata.get('description', '')}",
-            output_path=thumb_path,
-            preferred_style=thumbnail_style,
-            ai_metadata=metadata
-        )
+        if thumbnail_url and thumbnail_url.strip():
+            print(f"\n--- USING USER PROVIDED CUSTOM THUMBNAIL ---")
+            print(f"[Thumbnail] Downloading from: {thumbnail_url}")
+            download_file(thumbnail_url.strip(), thumb_path)
+        else:
+            print("\n--- GENERATING CUSTOM HINDI THUMBNAIL (16:9) ---")
+            create_video_thumbnail(
+                topic_or_title=f"{metadata.get('title', '')}\n{metadata.get('description', '')}",
+                output_path=thumb_path,
+                preferred_style=thumbnail_style,
+                ai_metadata=metadata
+            )
 
         # 8. Upload to YouTube
         tags = metadata.get("tags", []) + cfg.get("default_tags", [])
@@ -247,6 +253,7 @@ if __name__ == "__main__":
     parser.add_argument("--watermark-mode", default="cover_badge", choices=["cover_badge", "delogo", "none"])
     parser.add_argument("--logo-url", default="", help="Custom logo/image URL to cover watermark")
     parser.add_argument("--thumbnail-style", default="auto", choices=["auto", "1", "2"], help="Thumbnail style: 1 (News Maroon) or 2 (Education Yellow)")
+    parser.add_argument("--thumbnail-url", default="", help="Custom Thumbnail Image URL or Google Drive Link (Optional: overrides auto-generation)")
     parser.add_argument("--privacy", default="private", choices=["private", "unlisted", "public"])
     args = parser.parse_args()
 
@@ -258,5 +265,6 @@ if __name__ == "__main__":
         privacy=args.privacy,
         watermark_mode=args.watermark_mode,
         logo_image_url=args.logo_url,
-        thumbnail_style=args.thumbnail_style
+        thumbnail_style=args.thumbnail_style,
+        thumbnail_url=args.thumbnail_url
     )

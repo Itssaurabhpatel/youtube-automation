@@ -443,6 +443,41 @@ def generate_style2_pillow(headline: str, secondary_headline: str, key_benefit: 
     im.save(output_path, quality=95)
     return output_path
 
+def generate_ai_thumbnail_with_imagen(prompt: str, output_path: str) -> bool:
+    """Calls Google Imagen 3 API via GEMINI_API_KEY to generate photorealistic 16:9 YouTube thumbnails."""
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not gemini_key:
+        return False
+
+    models = ["imagen-3.0-generate-002", "imagegeneration@006", "imagegeneration@005"]
+    for model in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:predict?key={gemini_key}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "instances": [{"prompt": prompt}],
+            "parameters": {
+                "sampleCount": 1,
+                "aspectRatio": "16:9",
+                "outputMimeType": "image/jpeg"
+            }
+        }
+        try:
+            print(f"[Thumbnail AI] Requesting photorealistic thumbnail generation from {model}...")
+            r = requests.post(url, headers=headers, json=payload, timeout=60)
+            if r.status_code == 200:
+                data = r.json()
+                predictions = data.get("predictions", [])
+                if predictions and "bytesBase64Encoded" in predictions[0]:
+                    with open(output_path, "wb") as f:
+                        f.write(base64.b64decode(predictions[0]["bytesBase64Encoded"]))
+                    print(f"[Thumbnail AI] Successfully generated 8K AI thumbnail with {model}: {output_path}")
+                    return True
+            else:
+                print(f"[Thumbnail AI] {model} response: HTTP {r.status_code} ({r.text[:120]})")
+        except Exception as e:
+            print(f"[Thumbnail AI] Error with {model}: {e}")
+    return False
+
 def create_video_thumbnail(
     topic_or_title: str,
     output_path: str,
@@ -469,18 +504,42 @@ def create_video_thumbnail(
         is_news = any(k in (headline + subheadline).lower() for k in ["pm kisan", "योजना", "सब्सिडी", "किस्त", "सरकार", "न्यूज़", "तारीख", "फैसला", "अपडेट"])
         style = "1" if is_news else "2"
 
-    print(f"[Thumbnail] Rendering High-CTR Style {style} (Channel: Kisan Badlega)...")
+    print(f"[Thumbnail] Generating High-CTR Style {style} (Channel: Kisan Badlega)...")
 
-    # Get crop specific photos
+    # 1. Primary: Try Google Imagen 3 API with GEMINI_API_KEY for 8K Photorealistic AI Image
+    sec_h = meta.get("secondary_headline") or "1 गलती से 40% नुकसान!"
+    if style == "1":
+        pt_str = " | ".join(points[:3])
+        imagen_prompt = (
+            f"A professional, high-quality YouTube thumbnail in 16:9 aspect ratio (1280x720) for Indian agriculture channel 'Kisan Badlega'. "
+            f"TOP HEADER: Deep maroon-red background (#800000) occupying top 25% with very large bold white Hindi Devanagari typography '{clean_h}'. "
+            f"SUBHEADLINE: White rectangular banner directly below main headline with bold dark-red Hindi text '{subheadline}'. "
+            f"BACKGROUND: Realistic high-resolution agricultural farm photograph of lush healthy {crop_name} field under natural warm sunlight with cinematic depth. "
+            f"THREE VISUAL PANELS: Three equal-sized rectangular panels horizontally across the lower half with clean white borders showing {crop_name} seeds, healthy green plant, and modern farming equipment with red bottom labels. "
+            f"VISUAL STYLE: Bold Hindi news-thumbnail aesthetic, high contrast, dramatic lighting, 16:9 aspect ratio, 1280x720, photorealistic."
+        )
+    else:
+        imagen_prompt = (
+            f"A visually striking, professional YouTube thumbnail in 16:9 aspect ratio (1280x720) for Indian agriculture channel 'Kisan Badlega'. "
+            f"TOP BANNER: Bright yellow background (#FFD400) occupying top 25% with large bold black Hindi headline '{clean_h} | {sec_h}'. "
+            f"MAIN BACKGROUND: Full-frame photorealistic image of healthy lush agricultural field of {crop_name} under bright morning sunlight with flowing water. "
+            f"MAIN VISUAL: A photographic crop inset card on right side with clean thick white border showing macro close-up of healthy {crop_name} ears. "
+            f"ARROW: Large curved 3D yellow arrow with black outline pointing toward the crop inset. "
+            f"BOTTOM GRAPHIC: Two comparison cards near bottom left: 'पुराना तरीका (कम पैदावार)' with red border vs 'नया तरीका (3 गुना बंपर मुनाफा)' with green border connected by an arrow. "
+            f"VISUAL STYLE: High-contrast Hindi farming tips YouTube thumbnail, photorealistic, 16:9 aspect ratio, 1280x720."
+        )
+
+    if generate_ai_thumbnail_with_imagen(imagen_prompt, output_path):
+        return output_path
+
+    # 2. Fallback: Pixel-perfect Headless Chrome Engine
     p1, p2, p3 = get_crop_images(crop_name)
-
     if style == "1":
         html_code = get_style1_html(clean_h, subheadline, points, p1_img=p1, p2_img=p2, p3_img=p3)
         if render_html_to_image(html_code, output_path):
             return output_path
         return generate_style1_pillow(clean_h, subheadline, points, output_path)
     else:
-        sec_h = meta.get("secondary_headline") or "1 गलती से 40% नुकसान!"
         html_code = get_style2_html(clean_h, sec_h, benefit, crop_name, crop_img=p1)
         if render_html_to_image(html_code, output_path):
             return output_path
