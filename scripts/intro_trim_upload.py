@@ -145,7 +145,7 @@ def process_trim_intro_upload(
 ):
     cfg = load_config()
     print("=" * 60)
-    print("🎬 INTRO STITCH & TRIM AUTO-UPLOAD PIPELINE (KISAN BADLEGA)")
+    print("🎬 INTRO STITCH & TRIM AUTO-UPLOAD PIPELINE (KISAN BADLEGA) v2.0")
     print("=" * 60)
 
     with tempfile.TemporaryDirectory() as tmpdir:
