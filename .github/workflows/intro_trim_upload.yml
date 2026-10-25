@@ -72,10 +72,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install FFmpeg
+      - name: Install FFmpeg and Devanagari Fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-deva fonts-noto-core fonts-noto-extra fonts-indic
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt

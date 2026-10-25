@@ -91,39 +91,44 @@ def generate_metadata_from_audio(video_path: str, is_short: bool) -> dict:
             "}"
         )
 
-        # 1. Primary: Direct Base64 inline audio to Gemini 1.5 Flash (100% reliable REST API)
+        # 1. Primary: Direct Base64 inline audio to Gemini (with multi-model fallback)
         if gemini_key:
             try:
-                print("[AI SEO Engine] Uploading audio directly to Gemini 1.5 Flash for Hindi listening...")
+                print("[AI SEO Engine] Uploading audio directly to Gemini for Hindi listening...")
                 with open(audio_path, "rb") as af:
                     audio_b64 = base64.b64encode(af.read()).decode("utf-8")
 
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
-                payload = {
-                    "contents": [
-                        {
-                            "parts": [
-                                {"inlineData": {"mimeType": "audio/mp3", "data": audio_b64}},
-                                {"text": seo_prompt}
-                            ]
+                candidate_models = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+                for model_name in candidate_models:
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
+                    payload = {
+                        "contents": [
+                            {
+                                "parts": [
+                                    {"inlineData": {"mimeType": "audio/mp3", "data": audio_b64}},
+                                    {"text": seo_prompt}
+                                ]
+                            }
+                        ],
+                        "generationConfig": {
+                            "temperature": 0.4
                         }
-                    ],
-                    "generationConfig": {
-                        "temperature": 0.4
                     }
-                }
-                r = requests.post(url, json=payload, timeout=90)
-                if r.status_code == 200:
-                    resp_data = r.json()
-                    raw_text = resp_data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_text)
-                    raw_json = match.group(1).strip() if match else raw_text
-                    data = json.loads(raw_json)
-                    if "title" in data and "description" in data:
-                        print(f"[AI SEO Engine] Successfully created viral Hindi metadata via Gemini!")
-                        return data
-                else:
-                    print(f"[AI SEO Engine] Gemini direct audio failed (HTTP {r.status_code}): {r.text[:200]}")
+                    try:
+                        r = requests.post(url, json=payload, timeout=90)
+                        if r.status_code == 200:
+                            resp_data = r.json()
+                            raw_text = resp_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                            match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_text)
+                            raw_json = match.group(1).strip() if match else raw_text
+                            data = json.loads(raw_json)
+                            if "title" in data and "description" in data:
+                                print(f"[AI SEO Engine] Successfully created viral Hindi metadata via {model_name}!")
+                                return data
+                        else:
+                            print(f"[AI SEO Engine] {model_name} failed (HTTP {r.status_code}): {r.text[:150]}")
+                    except Exception as me:
+                        print(f"[AI SEO Engine] Error calling {model_name}: {me}")
             except Exception as e:
                 print(f"[AI SEO Engine] Gemini inline audio error: {e}")
 
