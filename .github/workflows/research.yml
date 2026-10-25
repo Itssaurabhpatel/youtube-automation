@@ -1,0 +1,32 @@
+name: Daily Topic Research
+
+on:
+  workflow_dispatch:
+  schedule:
+    # GitHub cron uses UTC. This is 03:30 UTC daily (09:00 IST).
+    - cron: "30 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Generate research brief
+        run: python scripts/research.py
+      - name: Upload research brief artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebooklm-research-brief
+          path: output/*.md
+          retention-days: 7

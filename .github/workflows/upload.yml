@@ -1,0 +1,59 @@
+name: Upload Video to YouTube
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: "Direct downloadable URL for the exported MP4"
+        required: true
+        type: string
+      title:
+        description: "YouTube video title"
+        required: true
+        type: string
+      description:
+        description: "Description, including source links"
+        required: true
+        type: string
+      tags:
+        description: "Comma-separated tags"
+        required: false
+        type: string
+      privacy:
+        description: "Keep private for testing"
+        required: true
+        type: choice
+        options:
+          - private
+          - unlisted
+          - public
+        default: private
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Upload video
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+        run: |
+          python scripts/youtube_upload.py \
+            --url "${{ inputs.video_url }}" \
+            --title "${{ inputs.title }}" \
+            --description "${{ inputs.description }}" \
+            --tags "${{ inputs.tags }}" \
+            --privacy "${{ inputs.privacy }}"

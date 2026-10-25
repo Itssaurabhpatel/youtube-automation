@@ -1,0 +1,14 @@
+{
+  "domain": "AI tools and technology",
+  "language": "English",
+  "google_news_query": "AI tools OR artificial intelligence",
+  "region": "IN",
+  "max_items": 15,
+  "upload_privacy": "private",
+  "category_id": "27",
+  "default_tags": [
+    "education",
+    "technology",
+    "explainer"
+  ]
+}
