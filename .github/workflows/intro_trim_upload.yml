@@ -7,11 +7,16 @@ on:
         description: "Main Video Link (Google Drive or Direct Link with 'Anyone with link')"
         required: true
         type: string
-      cut_seconds:
-        description: "Seconds to trim/cut from the beginning of Main Video"
+      cut_end_seconds:
+        description: "Seconds to cut/remove from the END of Main Video"
         required: true
         type: string
-        default: "3"
+        default: "2"
+      cut_start_seconds:
+        description: "Seconds to cut from the START of Main Video (Optional)"
+        required: false
+        type: string
+        default: "0"
       intro_url:
         description: "Intro Video Link (Optional: leave empty to use 'assets/intro.mp4' from repo)"
         required: false
@@ -76,7 +81,8 @@ jobs:
         run: |
           python scripts/intro_trim_upload.py \
             --video-url "${{ inputs.video_url }}" \
-            --cut-seconds "${{ inputs.cut_seconds }}" \
+            --cut-end-seconds "${{ inputs.cut_end_seconds || '2' }}" \
+            --cut-start-seconds "${{ inputs.cut_start_seconds || '0' }}" \
             --intro-url "${{ inputs.intro_url }}" \
             --watermark-mode "${{ inputs.watermark_mode || 'cover_badge' }}" \
             --logo-url "${{ inputs.logo_url }}" \

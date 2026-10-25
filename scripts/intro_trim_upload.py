@@ -53,13 +53,24 @@ def download_file(url_or_path: str, dest_path: str) -> str:
         sys.exit(f"Error: Failed to download valid video file from {url_or_path}")
     return dest_path
 
-def trim_video_start(input_path: str, cut_seconds: float, output_path: str):
-    """Trims the first `cut_seconds` from the beginning of the video."""
-    print(f"[Edit] Trimming first {cut_seconds}s from main video...")
+def trim_video(input_path: str, cut_start_seconds: float, cut_end_seconds: float, output_path: str):
+    """Trims start and/or end seconds from video."""
+    duration, _, _ = get_video_info(input_path)
+    start_time = max(0.0, cut_start_seconds)
+    target_duration = duration - start_time - max(0.0, cut_end_seconds)
+
+    if target_duration <= 0:
+        print("[Edit] Warning: Target duration too short after trim, keeping original video.")
+        import shutil
+        shutil.copy(input_path, output_path)
+        return
+
+    print(f"[Edit] Trimming main video: Start cut = {start_time}s, End cut = {cut_end_seconds}s (Total duration: {target_duration:.1f}s)...")
     cmd = [
         "ffmpeg", "-y",
-        "-ss", str(cut_seconds),
+        "-ss", str(start_time),
         "-i", input_path,
+        "-t", str(target_duration),
         "-c:v", "libx264",
         "-preset", "fast",
         "-c:a", "aac",
@@ -120,7 +131,8 @@ def merge_intro_and_video(intro_path: str, main_trimmed_path: str, output_path: 
 
 def process_trim_intro_upload(
     video_url: str,
-    cut_seconds: float,
+    cut_end_seconds: float = 2.0,
+    cut_start_seconds: float = 0.0,
     intro_url: str = "",
     privacy: str = "private",
     watermark_mode: str = "cover_badge",
@@ -153,9 +165,9 @@ def process_trim_intro_upload(
                 "Error: No intro video found! Please provide 'intro_url' or commit 'intro.mp4' into 'assets/' folder in the repository."
             )
 
-        # 3. Trim Starting Seconds from Main Video
-        if cut_seconds > 0:
-            trim_video_start(main_video_file, cut_seconds, trimmed_video_file)
+        # 3. Trim End / Start Seconds from Main Video
+        if cut_end_seconds > 0 or cut_start_seconds > 0:
+            trim_video(main_video_file, cut_start_seconds, cut_end_seconds, trimmed_video_file)
         else:
             import shutil
             shutil.copy(main_video_file, trimmed_video_file)
@@ -211,7 +223,8 @@ def process_trim_intro_upload(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--video-url", required=True, help="Main video Google Drive or Direct Link")
-    parser.add_argument("--cut-seconds", type=float, default=3.0, help="Seconds to trim from start of main video")
+    parser.add_argument("--cut-end-seconds", type=float, default=2.0, help="Seconds to trim from end of main video")
+    parser.add_argument("--cut-start-seconds", type=float, default=0.0, help="Seconds to trim from start of main video")
     parser.add_argument("--intro-url", default="", help="Intro video Google Drive or Direct Link (optional if assets/intro.mp4 exists)")
     parser.add_argument("--watermark-mode", default="cover_badge", choices=["cover_badge", "delogo", "none"])
     parser.add_argument("--logo-url", default="", help="Custom logo/image URL to cover watermark")
@@ -220,7 +233,8 @@ if __name__ == "__main__":
 
     process_trim_intro_upload(
         video_url=args.video_url,
-        cut_seconds=args.cut_seconds,
+        cut_end_seconds=args.cut_end_seconds,
+        cut_start_seconds=args.cut_start_seconds,
         intro_url=args.intro_url,
         privacy=args.privacy,
         watermark_mode=args.watermark_mode,
