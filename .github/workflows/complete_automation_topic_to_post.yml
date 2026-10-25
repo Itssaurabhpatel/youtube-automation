@@ -1,0 +1,92 @@
+name: Complete Automation from Topic to Post
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "1. Topic (Optional: enter your topic or leave empty to auto-find trending news)"
+        required: false
+        type: string
+        default: ""
+      video_url:
+        description: "2. NotebookLM / Video Link (Optional: Drive link or URL. Leave empty to auto-generate 16:9 video from topic)"
+        required: false
+        type: string
+        default: ""
+      thumbnail_style:
+        description: "3. Thumbnail Style (1: Bold Hindi News Maroon, 2: High-Contrast Farming Tips Yellow)"
+        required: true
+        type: choice
+        options:
+          - auto
+          - "1"
+          - "2"
+        default: auto
+      thumbnail_url:
+        description: "4. Custom Thumbnail Link (Optional: Drive link or direct URL. Leave empty for Auto-AI generation)"
+        required: false
+        type: string
+        default: ""
+      privacy:
+        description: "5. YouTube Privacy"
+        required: true
+        type: choice
+        options:
+          - private
+          - unlisted
+          - public
+        default: private
+
+  schedule:
+    # Optional daily automated run at 04:00 UTC (09:30 AM IST)
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  complete-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install FFmpeg and Devanagari Fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-deva fonts-noto-core fonts-noto-extra fonts-indic
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Complete Automation from Topic to Post
+        env:
+          PYTHONIOENCODING: utf-8
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/complete_automation.py \
+            --topic "${{ inputs.topic }}" \
+            --video-url "${{ inputs.video_url }}" \
+            --thumbnail-style "${{ inputs.thumbnail_style || 'auto' }}" \
+            --thumbnail-url "${{ inputs.thumbnail_url }}" \
+            --privacy "${{ inputs.privacy || 'private' }}"
+
+      - name: Save Final Video and Thumbnail as Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-automation-video-and-thumbnail
+          path: |
+            output/*.mp4
+            output/*.jpg
+          retention-days: 14

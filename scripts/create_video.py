@@ -175,6 +175,112 @@ def build_short_video(
     print(f"[Video] Successfully generated YouTube Short video: {output_path}")
     return output_path
 
+def generate_landscape_background(duration: float, output_bg: str):
+    """Creates a high-quality 16:9 (1280x720) agricultural background with subtle motion."""
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "lavfi",
+        "-i", f"color=c=0x143621:s=1280x720:r=30:d={duration}",
+        "-f", "lavfi",
+        "-i", f"cellauto=s=1280x720:r=15:rule=30:seed=4321:d={duration}",
+        "-filter_complex",
+        "[1:v]format=rgba,colorchannelmixer=aa=0.07[noise];[0:v][noise]overlay=shortest=1",
+        "-t", str(duration),
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-pix_fmt", "yuv420p",
+        output_bg
+    ]
+    simple_cmd = [
+        "ffmpeg", "-y",
+        "-f", "lavfi",
+        "-i", f"color=c=0x143621:s=1280x720:r=30:d={duration}",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-pix_fmt", "yuv420p",
+        output_bg
+    ]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True)
+    except Exception:
+        subprocess.run(simple_cmd, check=True, capture_output=True)
+
+def build_landscape_video(
+    script_text: str,
+    output_path: str,
+    voice: str = "hi-IN-MadhurNeural"
+) -> str:
+    """Builds a full 16:9 (1280x720) video with TTS voice, subtitles, and audio visualizer."""
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        audio_file = os.path.join(tmpdir, "voice.mp3")
+        srt_file = os.path.join(tmpdir, "subs.srt")
+        bg_file = os.path.join(tmpdir, "bg.mp4")
+
+        asyncio.run(create_speech_and_srt(script_text, voice, audio_file, srt_file))
+        duration = get_audio_duration(audio_file) + 0.5
+        generate_landscape_background(duration, bg_file)
+
+        shutil.copy(srt_file, "current_subs.srt")
+        sub_filter = (
+            "subtitles=current_subs.srt:force_style="
+            "'FontName=Arial,FontSize=24,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,"
+            "BorderStyle=3,Outline=2.5,Shadow=1,Alignment=2,MarginV=120'"
+        )
+        filter_complex = (
+            f"[0:v]{sub_filter}[subbed];"
+            f"[1:a]showwaves=s=800x120:mode=line:colors=0x52b788|0xe9c46a:r=30[waves];"
+            f"[subbed][waves]overlay=(W-w)/2:H-160:shortest=1[outv]"
+        )
+        ffmpeg_cmd = [
+            "ffmpeg", "-y",
+            "-i", bg_file,
+            "-i", audio_file,
+            "-filter_complex", filter_complex,
+            "-map", "[outv]",
+            "-map", "1:a",
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-t", str(duration),
+            output_path
+        ]
+        try:
+            subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
+        except Exception:
+            simple_ffmpeg = [
+                "ffmpeg", "-y",
+                "-i", bg_file,
+                "-i", audio_file,
+                "-vf", sub_filter,
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-c:a", "aac",
+                "-t", str(duration),
+                output_path
+            ]
+            try:
+                subprocess.run(simple_ffmpeg, check=True, capture_output=True)
+            except Exception:
+                pure_ffmpeg = [
+                    "ffmpeg", "-y",
+                    "-i", bg_file,
+                    "-i", audio_file,
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-t", str(duration),
+                    output_path
+                ]
+                subprocess.run(pure_ffmpeg, check=True)
+        finally:
+            if os.path.exists("current_subs.srt"):
+                try: os.remove("current_subs.srt")
+                except Exception: pass
+
+    print(f"[Video] Successfully generated 16:9 YouTube video: {output_path}")
+    return output_path
+
 if __name__ == "__main__":
     test_script = (
         "नमस्ते दोस्तों! क्या आप जानते हैं कि आर्टिफिशियल इंटेलिजेंस ने अब कोडिंग को पूरी तरह बदल दिया है? "
