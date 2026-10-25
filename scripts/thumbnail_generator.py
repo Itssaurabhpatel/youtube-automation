@@ -104,6 +104,9 @@ def render_html_to_image(html_content: str, output_image_path: str) -> bool:
         cmd = [
             chrome_bin,
             "--headless=new",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
             "--disable-gpu",
             "--hide-scrollbars",
             f"--window-size={w_size}",
@@ -395,38 +398,72 @@ def get_style2_html(headline: str, secondary_headline: str, key_benefit: str, cr
 </html>
 """
 
+def fetch_image_from_url(url: str) -> Image.Image:
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            from io import BytesIO
+            return Image.open(BytesIO(resp.read())).convert("RGB")
+    except Exception:
+        return None
+
 # Pillow Fallback Implementations
 def generate_style1_pillow(headline: str, subheadline: str, points: list, output_path: str):
-    im = Image.new("RGB", (1280, 720), (20, 50, 30))
+    im = fetch_image_from_url(DEFAULT_BG_URLS[0])
+    if im:
+        im = im.resize((1280, 720))
+    else:
+        im = Image.new("RGB", (1280, 720), (30, 60, 40))
+
+    overlay = Image.new("RGBA", (1280, 720), (0, 0, 0, 0))
+    ov_draw = ImageDraw.Draw(overlay)
+    ov_draw.rectangle([0, 135, 1280, 720], fill=(0, 0, 0, 100))
+    im = Image.alpha_composite(im.convert("RGBA"), overlay).convert("RGB")
+
     draw = ImageDraw.Draw(im)
-    font_main = get_devanagari_font(50, bold=True)
-    font_sub = get_devanagari_font(28, bold=True)
-    font_pt = get_devanagari_font(24, bold=True)
+    font_main = get_devanagari_font(48, bold=True)
+    font_sub = get_devanagari_font(26, bold=True)
+    font_pt = get_devanagari_font(22, bold=True)
 
     draw.rectangle([0, 0, 1280, 135], fill=(128, 0, 0))
     draw.line([(0, 135), (1280, 135)], fill=(255, 215, 0), width=5)
     
     # Headline
-    draw.text((50, 30), headline, font=font_main, fill=(255, 255, 255))
+    draw.text((40, 25), headline, font=font_main, fill=(255, 255, 255), stroke_width=4, stroke_fill=(0, 0, 0))
     # Subheadline
-    draw.rounded_rectangle([200, 105, 1080, 155], radius=10, fill=(255, 255, 255), outline=(128, 0, 0), width=3)
-    draw.text((230, 112), subheadline, font=font_sub, fill=(128, 0, 0))
+    draw.rounded_rectangle([150, 102, 1130, 156], radius=10, fill=(255, 255, 255), outline=(128, 0, 0), width=3)
+    draw.text((180, 110), subheadline, font=font_sub, fill=(128, 0, 0))
 
     # 3 Panels
     pts = (points + ["बड़ा फैसला", "सीधे खाते में", "100% पक्का लाभ"])[:3]
+    photos = [CROP_PHOTOS["seeds"], CROP_PHOTOS["green_wheat"], CROP_PHOTOS["wheat"]]
     for i in range(3):
-        px = 40 + i * 410
-        draw.rounded_rectangle([px, 175, px + 380, 680], radius=16, fill=(35, 75, 45), outline=(255, 255, 255), width=5)
-        draw.rounded_rectangle([px + 15, 610, px + 365, 665], radius=10, fill=(128, 0, 0), outline=(255, 255, 255), width=3)
-        draw.text((px + 25, 620), pts[i], font=font_pt, fill=(255, 235, 59))
+        px = 35 + i * 415
+        p_img = fetch_image_from_url(photos[i])
+        if p_img:
+            p_img = p_img.resize((380, 500))
+            mask = Image.new("L", (380, 500), 0)
+            m_draw = ImageDraw.Draw(mask)
+            m_draw.rounded_rectangle([0, 0, 380, 500], radius=16, fill=255)
+            im.paste(p_img, (px, 175), mask)
+
+        p_draw = ImageDraw.Draw(im)
+        p_draw.rounded_rectangle([px, 175, px + 380, 675], radius=16, outline=(255, 255, 255), width=5)
+        p_draw.rounded_rectangle([px + 15, 610, px + 365, 660], radius=10, fill=(128, 0, 0), outline=(255, 255, 255), width=3)
+        p_draw.text((px + 25, 618), pts[i], font=font_pt, fill=(255, 235, 59))
     im.save(output_path, quality=95)
     return output_path
 
 def generate_style2_pillow(headline: str, secondary_headline: str, key_benefit: str, crop_name: str, output_path: str):
-    im = Image.new("RGB", (1280, 720), (20, 50, 30))
+    im = fetch_image_from_url(DEFAULT_BG_URLS[0])
+    if im:
+        im = im.resize((1280, 720))
+    else:
+        im = Image.new("RGB", (1280, 720), (30, 60, 40))
+
     draw = ImageDraw.Draw(im)
-    font_main = get_devanagari_font(42, bold=True)
-    font_sub = get_devanagari_font(26, bold=True)
+    font_main = get_devanagari_font(40, bold=True)
+    font_sub = get_devanagari_font(24, bold=True)
 
     draw.rectangle([0, 0, 1280, 125], fill=(255, 212, 0))
     draw.line([(0, 125), (1280, 125)], fill=(0, 0, 0), width=5)
@@ -435,11 +472,21 @@ def generate_style2_pillow(headline: str, secondary_headline: str, key_benefit: 
 
     draw.rounded_rectangle([40, 145, 650, 260], radius=14, fill=(180, 0, 0), outline=(255, 212, 0), width=4)
     draw.text((60, 160), "बड़ा फायदा:", font=font_sub, fill=(255, 212, 0))
-    draw.text((60, 200), key_benefit, font=font_main, fill=(255, 255, 255))
+    draw.text((60, 195), key_benefit, font=font_main, fill=(255, 255, 255), stroke_width=4, stroke_fill=(0, 0, 0))
 
-    draw.rounded_rectangle([700, 145, 1240, 680], radius=18, fill=(30, 70, 40), outline=(255, 255, 255), width=5)
-    draw.rounded_rectangle([720, 610, 1220, 665], radius=10, fill=(255, 212, 0), outline=(0, 0, 0), width=3)
-    draw.text((740, 620), f"फसल: {crop_name}", font=font_sub, fill=(0, 0, 0))
+    # Inset Crop Photo
+    crop_im = fetch_image_from_url(CROP_PHOTOS["wheat"])
+    if crop_im:
+        crop_im = crop_im.resize((540, 520))
+        mask = Image.new("L", (540, 520), 0)
+        m_draw = ImageDraw.Draw(mask)
+        m_draw.rounded_rectangle([0, 0, 540, 520], radius=18, fill=255)
+        im.paste(crop_im, (700, 145), mask)
+
+    draw = ImageDraw.Draw(im)
+    draw.rounded_rectangle([700, 145, 1240, 665], radius=18, outline=(255, 255, 255), width=5)
+    draw.rounded_rectangle([720, 605, 1220, 655], radius=10, fill=(255, 212, 0), outline=(0, 0, 0), width=3)
+    draw.text((740, 615), f"फसल: {crop_name}", font=font_sub, fill=(0, 0, 0))
     im.save(output_path, quality=95)
     return output_path
 
