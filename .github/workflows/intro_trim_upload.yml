@@ -1,0 +1,75 @@
+name: Trim & Merge Intro Video (Auto Metadata & Upload)
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: "Main Video Link (Google Drive or Direct Link with 'Anyone with link')"
+        required: true
+        type: string
+      cut_seconds:
+        description: "Seconds to trim/cut from the beginning of Main Video"
+        required: true
+        type: string
+        default: "3"
+      intro_url:
+        description: "Intro Video Link (Optional: leave empty to use 'assets/intro.mp4' from repo)"
+        required: false
+        type: string
+        default: ""
+      privacy:
+        description: "YouTube Privacy"
+        required: true
+        type: choice
+        options:
+          - private
+          - unlisted
+          - public
+        default: private
+
+permissions:
+  contents: read
+
+jobs:
+  trim-merge-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Trim, Merge Intro, Auto-Generate Metadata and Upload
+        env:
+          PYTHONIOENCODING: utf-8
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/intro_trim_upload.py \
+            --video-url "${{ inputs.video_url }}" \
+            --cut-seconds "${{ inputs.cut_seconds }}" \
+            --intro-url "${{ inputs.intro_url }}" \
+            --privacy "${{ inputs.privacy || 'private' }}"
+
+      - name: Save Merged Video as Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-merged-video
+          path: output/*.mp4
+          retention-days: 7
