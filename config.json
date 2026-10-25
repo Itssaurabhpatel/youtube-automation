@@ -3,13 +3,15 @@
   "language": "Hindi",
   "google_news_query": "AI tools OR artificial intelligence OR तकनीक",
   "region": "IN",
-  "max_items": 15,
+  "ai_provider": "auto",
+  "voice": "hi-IN-MadhurNeural",
   "upload_privacy": "private",
   "category_id": "27",
   "default_tags": [
-    "education",
     "technology",
     "ai in hindi",
-    "hindi"
+    "hindi",
+    "shorts",
+    "ai news"
   ]
 }

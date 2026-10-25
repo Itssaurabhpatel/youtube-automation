@@ -10,23 +10,12 @@ from googleapiclient.http import MediaFileUpload
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--url", default=os.getenv("VIDEO_URL", ""))
-    p.add_argument("--title", required=True)
-    p.add_argument("--description", default="")
-    p.add_argument("--tags", default="")
-    p.add_argument("--privacy", choices=["private", "unlisted", "public"], default="private")
-    p.add_argument("--category", default="27")
-    args = p.parse_args()
-
+def upload_local_file(video_path: str, title: str, description: str, tags: list, privacy: str = "private", category: str = "27") -> str:
     client_id = os.getenv("YT_CLIENT_ID")
     client_secret = os.getenv("YT_CLIENT_SECRET")
     refresh_token = os.getenv("YT_REFRESH_TOKEN")
     if not all([client_id, client_secret, refresh_token]):
         sys.exit("Missing YT_CLIENT_ID, YT_CLIENT_SECRET, or YT_REFRESH_TOKEN environment secret.")
-    if not args.url:
-        sys.exit("No video URL supplied. Provide --url or VIDEO_URL secret.")
 
     creds = Credentials(
         token=None,
@@ -38,6 +27,50 @@ def main():
     )
     creds.refresh(Request())
     youtube = build("youtube", "v3", credentials=creds)
+
+    body = {
+        "snippet": {
+            "title": title[:100],
+            "description": description[:5000],
+            "categoryId": str(category),
+            "tags": tags[:500],
+        },
+        "status": {
+            "privacyStatus": privacy,
+            "selfDeclaredMadeForKids": False
+        }
+    }
+    media = MediaFileUpload(video_path, mimetype="video/mp4", chunksize=8 * 1024 * 1024, resumable=True)
+    request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
+    response = None
+    while response is None:
+        status, response = request.next_chunk()
+        if status:
+            print(f"Upload progress: {int(status.progress() * 100)}%")
+    vid = response["id"]
+    print(f"UPLOAD_SUCCESS privacy={privacy}")
+    print(f"VIDEO_URL=https://www.youtube.com/watch?v={vid}")
+    return vid
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--file", default="", help="Path to local video file")
+    p.add_argument("--url", default=os.getenv("VIDEO_URL", ""), help="Direct video URL")
+    p.add_argument("--title", required=True)
+    p.add_argument("--description", default="")
+    p.add_argument("--tags", default="")
+    p.add_argument("--privacy", choices=["private", "unlisted", "public"], default="private")
+    p.add_argument("--category", default="27")
+    args = p.parse_args()
+
+    tags = [t.strip() for t in args.tags.split(",") if t.strip()]
+
+    if args.file and os.path.exists(args.file):
+        upload_local_file(args.file, args.title, args.description, tags, args.privacy, args.category)
+        return
+
+    if not args.url:
+        sys.exit("Neither --file nor --url was supplied.")
 
     # Download to runner temp storage. URL must serve the actual file, not an HTML preview.
     with tempfile.TemporaryDirectory() as tmp:
