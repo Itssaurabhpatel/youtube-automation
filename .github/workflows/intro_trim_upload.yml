@@ -17,6 +17,20 @@ on:
         required: false
         type: string
         default: ""
+      watermark_mode:
+        description: "NotebookLM Watermark Removal Mode"
+        required: true
+        type: choice
+        options:
+          - cover_badge
+          - delogo
+          - none
+        default: cover_badge
+      logo_url:
+        description: "Custom Logo/Pic URL to cover watermark (Optional: leave empty to use assets/logo.png from repo)"
+        required: false
+        type: string
+        default: ""
       privacy:
         description: "YouTube Privacy"
         required: true
@@ -64,6 +78,8 @@ jobs:
             --video-url "${{ inputs.video_url }}" \
             --cut-seconds "${{ inputs.cut_seconds }}" \
             --intro-url "${{ inputs.intro_url }}" \
+            --watermark-mode "${{ inputs.watermark_mode || 'cover_badge' }}" \
+            --logo-url "${{ inputs.logo_url }}" \
             --privacy "${{ inputs.privacy || 'private' }}"
 
       - name: Save Merged Video as Artifact

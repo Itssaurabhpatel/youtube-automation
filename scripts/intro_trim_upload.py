@@ -13,6 +13,7 @@ sys.path.append(os.path.join(ROOT, "scripts"))
 
 from youtube_upload import upload_local_file
 from drive_upload import get_video_info, generate_metadata_from_audio, load_config
+from watermark_handler import apply_watermark_removal
 
 def has_audio_stream(file_path: str) -> bool:
     """Checks if video contains an audio stream using ffprobe."""
@@ -121,7 +122,9 @@ def process_trim_intro_upload(
     video_url: str,
     cut_seconds: float,
     intro_url: str = "",
-    privacy: str = "private"
+    privacy: str = "private",
+    watermark_mode: str = "cover_badge",
+    logo_image_url: str = ""
 ):
     cfg = load_config()
     print("=" * 60)
@@ -160,32 +163,41 @@ def process_trim_intro_upload(
         # 4. Merge Intro + Trimmed Main Video
         merge_intro_and_video(intro_file, trimmed_video_file, merged_video_file)
 
+        # 5. NotebookLM Watermark Removal / Logo Cover
+        cleaned_video_file = os.path.join(tmpdir, "final_cleaned.mp4")
+        final_video_file = apply_watermark_removal(
+            merged_video_file,
+            cleaned_video_file,
+            mode=watermark_mode,
+            custom_image_path=logo_image_url
+        )
+
         # Save to output folder for artifact download
         out_dir = os.path.join(ROOT, "output")
         os.makedirs(out_dir, exist_ok=True)
         persisted_final = os.path.join(out_dir, f"merged_kisan_{os.path.basename(main_video_file)}")
         import shutil
-        shutil.copy(merged_video_file, persisted_final)
+        shutil.copy(final_video_file, persisted_final)
 
-        # 5. AI Metadata Generation from the Merged Video
-        duration, w, h = get_video_info(merged_video_file)
+        # 6. AI Metadata Generation from the Final Video
+        duration, w, h = get_video_info(final_video_file)
         is_short = (duration <= 60 or h > w)
         print(f"[Video Details] Duration: {duration:.1f}s | Resolution: {w}x{h} | Type: {'Shorts' if is_short else 'Long'}")
 
-        metadata = generate_metadata_from_audio(merged_video_file, is_short=is_short)
+        metadata = generate_metadata_from_audio(final_video_file, is_short=is_short)
         print("\n--- AUTO-GENERATED METADATA ---")
         print(f"Title: {metadata['title']}")
         print(f"Tags: {', '.join(metadata.get('tags', []))}")
         print(f"Description:\n{metadata['description'][:200]}...")
         print("-------------------------------\n")
 
-        # 6. Upload to YouTube
+        # 7. Upload to YouTube
         tags = metadata.get("tags", []) + cfg.get("default_tags", [])
         category = cfg.get("category_id", "27")
         upload_privacy = privacy or cfg.get("upload_privacy", "private")
 
         vid = upload_local_file(
-            video_path=merged_video_file,
+            video_path=final_video_file,
             title=metadata["title"],
             description=metadata["description"],
             tags=tags,
@@ -201,6 +213,8 @@ if __name__ == "__main__":
     parser.add_argument("--video-url", required=True, help="Main video Google Drive or Direct Link")
     parser.add_argument("--cut-seconds", type=float, default=3.0, help="Seconds to trim from start of main video")
     parser.add_argument("--intro-url", default="", help="Intro video Google Drive or Direct Link (optional if assets/intro.mp4 exists)")
+    parser.add_argument("--watermark-mode", default="cover_badge", choices=["cover_badge", "delogo", "none"])
+    parser.add_argument("--logo-url", default="", help="Custom logo/image URL to cover watermark")
     parser.add_argument("--privacy", default="private", choices=["private", "unlisted", "public"])
     args = parser.parse_args()
 
@@ -208,5 +222,7 @@ if __name__ == "__main__":
         video_url=args.video_url,
         cut_seconds=args.cut_seconds,
         intro_url=args.intro_url,
-        privacy=args.privacy
+        privacy=args.privacy,
+        watermark_mode=args.watermark_mode,
+        logo_image_url=args.logo_url
     )
