@@ -35,10 +35,10 @@ def apply_watermark_removal(
 
     if mode == "cover_badge" and logo_path:
         print(f"[Watermark] Covering NotebookLM watermark with custom image: {logo_path}")
-        # Scale logo to ~240px width and place at bottom-right corner (padding 20px)
+        # Scale logo to ~310px width with clean subtle white backing to 100% block watermark text
         filter_complex = (
-            "[1:v]scale=240:-1[logo];"
-            "[0:v][logo]overlay=main_w-overlay_w-25:main_h-overlay_h-25"
+            "[1:v]scale=310:-1,format=rgba,pad=iw+16:ih+10:8:5:color=white@0.95[logo];"
+            "[0:v][logo]overlay=main_w-overlay_w-25:main_h-overlay_h-30"
         )
         cmd = [
             "ffmpeg", "-y",
