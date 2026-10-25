@@ -1,7 +1,7 @@
 {
   "domain": "AI tools and technology",
-  "language": "English",
-  "google_news_query": "AI tools OR artificial intelligence",
+  "language": "Hindi",
+  "google_news_query": "AI tools OR artificial intelligence OR तकनीक",
   "region": "IN",
   "max_items": 15,
   "upload_privacy": "private",
@@ -9,6 +9,7 @@
   "default_tags": [
     "education",
     "technology",
-    "explainer"
+    "ai in hindi",
+    "hindi"
   ]
 }
