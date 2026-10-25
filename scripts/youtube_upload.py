@@ -42,7 +42,8 @@ def main():
     # Download to runner temp storage. URL must serve the actual file, not an HTML preview.
     with tempfile.TemporaryDirectory() as tmp:
         video_path = os.path.join(tmp, "video.mp4")
-        with requests.get(args.url, stream=True, timeout=(30, 180)) as r:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        with requests.get(args.url, headers=headers, stream=True, timeout=(30, 180)) as r:
             r.raise_for_status()
             content_type = r.headers.get("Content-Type", "").lower()
             if "text/html" in content_type:
