@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
+import base64
 import json
 import math
 import os
 import re
 import urllib.request
+import requests
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -233,6 +235,41 @@ def generate_style2_education(
     print(f"[Thumbnail] Style 2 generated successfully: {output_path}")
     return output_path
 
+def generate_ai_thumbnail_with_imagen(prompt: str, output_path: str) -> bool:
+    """Uses Google Imagen 3 API to generate a photorealistic YouTube thumbnail."""
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not gemini_key:
+        return False
+
+    models = ["imagen-3.0-generate-002", "imagegeneration@006", "imagegeneration@005"]
+    for model in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:predict?key={gemini_key}"
+        payload = {
+            "instances": [{"prompt": prompt}],
+            "parameters": {
+                "sampleCount": 1,
+                "aspectRatio": "16:9",
+                "outputMimeType": "image/jpeg"
+            }
+        }
+        try:
+            print(f"[Thumbnail AI] Requesting photorealistic thumbnail generation from {model}...")
+            r = requests.post(url, json=payload, timeout=60)
+            if r.status_code == 200:
+                data = r.json()
+                predictions = data.get("predictions", [])
+                if predictions and "bytesBase64Encoded" in predictions[0]:
+                    b64_img = predictions[0]["bytesBase64Encoded"]
+                    with open(output_path, "wb") as f:
+                        f.write(base64.b64decode(b64_img))
+                    print(f"[Thumbnail AI] Photorealistic AI Thumbnail generated successfully: {output_path}")
+                    return True
+            else:
+                print(f"[Thumbnail AI] {model} response: HTTP {r.status_code}")
+        except Exception as e:
+            print(f"[Thumbnail AI] Error with {model}: {e}")
+    return False
+
 def create_video_thumbnail(
     topic_or_title: str,
     output_path: str,
@@ -244,9 +281,9 @@ def create_video_thumbnail(
 
     meta = ai_metadata or {}
     headline = meta.get("thumb_headline") or meta.get("title", "")
-    subheadline = meta.get("thumb_subheadline") or "3 गुना मुनाफे का नया तरीका!"
-    points = meta.get("thumb_points") or ["बड़ा फैसला", "सीधे खाते में", "100% पक्का लाभ"]
-    crop_name = meta.get("crop_name") or "खेती"
+    subheadline = meta.get("thumb_subheadline") or "कम पानी में 40 क्विंटल पैदावार की गारंटी"
+    points = meta.get("thumb_points") or ["किस्म 1", "खाद तकनीक", "सिंचाई नियम"]
+    crop_name = meta.get("crop_name") or "गेहूं"
     benefit = meta.get("key_benefit") or "3 गुना पैदावार गारंटी!"
 
     clean_h = re.sub(r"[#\|].*", "", headline).strip()
@@ -259,7 +296,44 @@ def create_video_thumbnail(
         is_news = any(k in (headline + subheadline).lower() for k in ["pm kisan", "योजना", "सब्सिडी", "किस्त", "सरकार", "न्यूज़", "तारीख", "फैसला"])
         style = "1" if is_news else "2"
 
-    print(f"[Thumbnail Engine] Rendering Style {style}...")
+    # 1. Primary: Generate Photorealistic AI Thumbnail using Imagen 3 with your exact prompt templates
+    pt_str = " | ".join(points[:3])
+    if style == "1":
+        imagen_prompt = (
+            f"A professional, high-quality YouTube thumbnail in 16:9 aspect ratio (1280x720) for Indian agriculture channel 'Kisan Badlega'. "
+            f"TOPIC: {topic_or_title}. "
+            f"MAIN HEADLINE IN HINDI: '{clean_h}'. "
+            f"SUBHEADLINE IN HINDI: '{subheadline}'. "
+            f"THREE VISUAL POINTS: {pt_str}. "
+            f"DESIGN AND LAYOUT: "
+            f"1. TOP HEADER: Deep maroon-red background (#800000) occupying top 25% with very large, bold white Devanagari typography '{clean_h}'. "
+            f"2. SUBHEADLINE: Crisp white rectangular banner directly beneath header with bold dark-red Hindi text '{subheadline}'. "
+            f"3. BACKGROUND: Realistic, high-resolution cinematic agricultural farm photograph with rich golden {crop_name} and green foliage under natural sunlight, cinematic depth. "
+            f"4. THREE VISUAL PANELS: Arranged horizontally across the lower half: three equal-sized rectangular panels with clean white borders and subtle rounded corners showing {crop_name} seeds, fertilizer bag, and modern farming equipment with red bottom labels. "
+            f"5. VISUAL STYLE: Bold Hindi news-thumbnail aesthetic, high contrast, dramatic realistic lighting. 16:9 aspect ratio, 1280x720."
+        )
+    else:
+        imagen_prompt = (
+            f"A visually striking, professional YouTube thumbnail in 16:9 aspect ratio (1280x720) for Indian agriculture channel 'Kisan Badlega'. "
+            f"VIDEO TOPIC: {topic_or_title}. "
+            f"MAIN HEADLINE: '{clean_h}'. "
+            f"SECONDARY HEADLINE: '{subheadline}'. "
+            f"KEY BENEFIT: '{benefit}'. "
+            f"FEATURED CROP: {crop_name}. "
+            f"DESIGN AND LAYOUT: "
+            f"1. TOP BANNER: Bright yellow background (#FFD400) occupying top 25% with large bold black Hindi typography '{clean_h} | {subheadline}'. "
+            f"2. MAIN BACKGROUND: Full-frame photorealistic image of healthy lush agricultural field of {crop_name} with natural sunlight. "
+            f"3. MAIN VISUAL: Inset photographic crop card on right with clean thick white border showing close-up of {crop_name}, pointed to by a large curved yellow arrow with black outline. "
+            f"4. BOTTOM INFORMATION GRAPHIC: Two white comparison cards near bottom showing 'पुराना तरीका (कम पैदावार)' vs 'नया तरीका (3 गुना बंपर मुनाफा)' connected by an arrow. "
+            f"5. COLOR PALETTE: Bright yellow (#FFD400), pure black, agricultural green, white borders. 16:9 aspect ratio, 1280x720."
+        )
+
+    # Try AI generation first
+    if generate_ai_thumbnail_with_imagen(imagen_prompt, output_path):
+        return output_path
+
+    # Fallback to local graphic composite engine
+    print(f"[Thumbnail Engine] Rendering Composite Style {style}...")
     if style == "2":
         return generate_style2_education(clean_h, subheadline, benefit, crop_name, output_path, out_dir)
     else:
