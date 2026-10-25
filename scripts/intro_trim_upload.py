@@ -216,7 +216,8 @@ def process_trim_intro_upload(
         create_video_thumbnail(
             topic_or_title=f"{metadata.get('title', '')}\n{metadata.get('description', '')}",
             output_path=thumb_path,
-            preferred_style=thumbnail_style
+            preferred_style=thumbnail_style,
+            ai_metadata=metadata
         )
 
         # 8. Upload to YouTube

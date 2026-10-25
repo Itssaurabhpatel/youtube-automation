@@ -63,70 +63,127 @@ def extract_audio(video_path: str, audio_path: str):
     print(f"[Audio] Extracted audio for AI analysis: {audio_path}")
 
 def generate_metadata_from_audio(video_path: str, is_short: bool) -> dict:
-    """Uses Gemini to listen to video audio and create viral Hindi metadata for Kisan Badlega."""
+    """Uses Gemini inline audio listening or Speech Recognition to create viral, high-SEO Hindi metadata for Kisan Badlega."""
+    import base64
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
     clean_filename = os.path.splitext(os.path.basename(video_path))[0]
     clean_filename = re.sub(r"[_\-]+", " ", clean_filename)
 
-    if gemini_key:
+    with tempfile.TemporaryDirectory() as tmp:
+        audio_path = os.path.join(tmp, "audio_compressed.mp3")
+        extract_audio(video_path, audio_path)
+
+        short_instruction = "This is a YouTube Short (under 60s). Must add #Shorts in title and description." if is_short else "This is a full-length YouTube video."
+        seo_prompt = (
+            "You are India's top YouTube SEO strategist and content director for the Hindi Agriculture channel 'Kisan Badlega' (किसान बदलेगा).\n"
+            "Listen to this audio track from our newly uploaded agriculture video. Understand the exact crops, diseases, fertilizers, government schemes, or techniques discussed.\n"
+            f"Context: {short_instruction}\n\n"
+            "Generate an elite, high-retention YouTube SEO package tailored for Indian farmers. Return ONLY a valid JSON object with these EXACT keys:\n"
+            "{\n"
+            '  "title": "Ultra high-CTR Hindi / Hinglish Title under 65 chars. Must create irresistible curiosity or promise big profit/warning, ending with #KisanBadlega #Shorts",\n'
+            '  "description": "Comprehensive, highly formatted YouTube description in Hindi. Structure:\\n- Powerful Hook sentence\\n- 📌 प्रमुख बिंदु (3-4 bullet points from the video)\\n- 💡 किसान भाइयों के लिए विशेष सलाह\\n- 🌾 चैनल परिचय (किसान बदलेगा को सब्सक्राइब करें)\\n- ⚠️ अस्वीकरण (Disclaimer)\\n- 🏷️ 15+ trending hashtags including #KisanBadlega #KhetiBadi #IndianAgriculture",\n'
+            '  "tags": ["Kisan Badlega", "kheti", "kisan", "agriculture", "...at least 20 highly searched farming keywords in Hindi and English..."],\n'
+            '  "thumb_headline": "3 to 5 BIG PUNCHY Hindi words for the top thumbnail headline (e.g. गेहूं में ये 1 स्प्रे डालो!)",\n'
+            '  "thumb_subheadline": "Shocking or high-benefit subheadline (e.g. 3 गुना पैदावार की पक्की गारंटी!)",\n'
+            '  "crop_name": "Name of crop or topic (e.g. गेहूं, टमाटर, सरसों, PM किसान)",\n'
+            '  "key_benefit": "Main promise/benefit (e.g. 3 गुना पैदावार गारंटी!)",\n'
+            '  "thumb_points": ["पॉइंट 1", "पॉइंट 2", "पॉइंट 3"]\n'
+            "}"
+        )
+
+        # 1. Primary: Direct Base64 inline audio to Gemini 1.5 Flash (100% reliable REST API)
+        if gemini_key:
+            try:
+                print("[AI SEO Engine] Uploading audio directly to Gemini 1.5 Flash for Hindi listening...")
+                with open(audio_path, "rb") as af:
+                    audio_b64 = base64.b64encode(af.read()).decode("utf-8")
+
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+                payload = {
+                    "contents": [
+                        {
+                            "parts": [
+                                {"inlineData": {"mimeType": "audio/mp3", "data": audio_b64}},
+                                {"text": seo_prompt}
+                            ]
+                        }
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.4
+                    }
+                }
+                r = requests.post(url, json=payload, timeout=90)
+                if r.status_code == 200:
+                    resp_data = r.json()
+                    raw_text = resp_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_text)
+                    raw_json = match.group(1).strip() if match else raw_text
+                    data = json.loads(raw_json)
+                    if "title" in data and "description" in data:
+                        print(f"[AI SEO Engine] Successfully created viral Hindi metadata via Gemini!")
+                        return data
+                else:
+                    print(f"[AI SEO Engine] Gemini direct audio failed (HTTP {r.status_code}): {r.text[:200]}")
+            except Exception as e:
+                print(f"[AI SEO Engine] Gemini inline audio error: {e}")
+
+        # 2. Secondary: Speech Recognition to transcribe Hindi speech
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=gemini_key)
+            import speech_recognition as sr
+            print("[AI SEO Engine] Attempting Hindi speech-to-text recognition...")
+            wav_path = os.path.join(tmp, "speech.wav")
+            cmd = ["ffmpeg", "-y", "-i", audio_path, "-ar", "16000", "-ac", "1", wav_path]
+            subprocess.run(cmd, capture_output=True, check=True)
 
-            with tempfile.TemporaryDirectory() as tmp:
-                audio_path = os.path.join(tmp, "audio.mp3")
-                extract_audio(video_path, audio_path)
+            r_sr = sr.Recognizer()
+            with sr.AudioFile(wav_path) as source:
+                audio_rec = r_sr.record(source, duration=90)
+                transcript = r_sr.recognize_google(audio_rec, language="hi-IN")
+                print(f"[AI SEO Engine] Transcribed Hindi text: {transcript[:100]}...")
 
-                print("[AI] Uploading audio track to Gemini for Hindi content understanding...")
-                audio_file = genai.upload_file(path=audio_path)
-                
-                model = genai.GenerativeModel("gemini-1.5-flash")
-                short_instruction = "This is a YouTube Short (under 60s). Add #Shorts in title and tags." if is_short else "This is a full-length YouTube video."
+                # Ask AI to generate from transcript
+                if gemini_key:
+                    t_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+                    t_payload = {
+                        "contents": [{"parts": [{"text": f"{seo_prompt}\n\nSpoken Video Transcript:\n{transcript}"}]}],
+                        "generationConfig": {"temperature": 0.4}
+                    }
+                    t_r = requests.post(t_url, json=t_payload, timeout=45)
+                    if t_r.status_code == 200:
+                        t_data = json.loads(re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", t_r.json()["candidates"][0]["content"]["parts"][0]["text"]).group(1).strip())
+                        return t_data
+        except Exception as e_sr:
+            print(f"[AI SEO Engine] Speech recognition fallback: {e_sr}")
 
-                prompt = (
-                    "You are a top YouTube SEO strategist and content director for the Indian Agriculture channel 'Kisan Badlega' (किसान बदलेगा). "
-                    "Listen to this audio track from the uploaded video. Understand the crop names, farming techniques, government schemes, or advice discussed. "
-                    f"Filename context: '{clean_filename}'. {short_instruction}\n\n"
-                    "Generate a high-CTR, viral YouTube title, detailed SEO description, and search tags tailored for Indian farmers.\n"
-                    "Output ONLY a valid JSON object:\n"
-                    "{\n"
-                    '  "title": "Engaging Hindi/Hinglish Title under 70 chars with #Shorts if short (e.g. किसान भाई इस फसल से कमाएं लाखों | #Shorts)",\n'
-                    '  "description": "Comprehensive description in Hindi. Include video summary, 3 practical takeaways, channel mention (किसान बदलेगा), and hashtags #KisanBadlega #KhetiBadi #Kisan #Agriculture",\n'
-                    '  "tags": ["Kisan Badlega", "kheti", "kheti badi", "agriculture in india", "kisan", "...10 more relevant tags..."]\n'
-                    "}"
-                )
-
-                response = model.generate_content([audio_file, prompt])
-                raw_text = response.text.strip()
-                match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_text)
-                if match:
-                    raw_text = match.group(1).strip()
-                data = json.loads(raw_text)
-                if "title" in data and "description" in data:
-                    print(f"[AI] Successfully generated metadata with Gemini!")
-                    return data
-        except Exception as e:
-            print(f"[AI] Gemini audio analysis error: {e}. Falling back to filename metadata.")
-
-    # High quality fallback based on filename and channel brand
-    print(f"[AI] Using smart metadata generator based on video: '{clean_filename}'")
+    # 3. High-Quality Brand Fallback (Never show 'drive_video')
+    print("[AI SEO Engine] Using high-retention agricultural SEO template...")
     short_tag = " #Shorts" if is_short else ""
     return {
-        "title": f"किसान भाई जरूर देखें: {clean_filename[:50]}{short_tag}",
+        "title": f"किसान भाई जरूर देखें: खेती में 3 गुना बंपर मुनाफा | #KisanBadlega{short_tag}",
         "description": (
-            f"राम-राम किसान भाइयों! आज के इस वीडियो में {clean_filename} के बारे में महत्वपूर्ण जानकारी दी गई है।\n\n"
-            f"खेती-किसानी के नए तौर-तरीकों, आधुनिक तकनीकों और सरकारी योजनाओं के लिए 'किसान बदलेगा' चैनल को अभी सब्सक्राइब करें!\n\n"
-            f"#KisanBadlega #KhetiBadi #Kisan #FarmingInIndia #Agriculture{short_tag}"
+            "राम-राम किसान भाइयों! 🌾\n\n"
+            "आज के इस वीडियो में खेती-किसानी से जुड़ी बेहद महत्वपूर्ण जानकारी दी गई है। "
+            "कम लागत में ज्यादा मुनाफा कैसे कमाएं और आधुनिक कृषि तकनीकों का सही इस्तेमाल कैसे करें।\n\n"
+            "📌 मुख्य बिंदु:\n"
+            "1️⃣ सही समय पर सही खाद और सिंचाई का चुनाव\n"
+            "2️⃣ कम लागत में 3 गुना पैदावार की तकनीक\n"
+            "3️⃣ सरकारी कृषि सब्सिडी योजनाओं का पूरा लाभ\n\n"
+            "💡 किसान सलाह: हमेशा प्रमाणित बीज और जैविक उर्वरक का उपयोग करें।\n\n"
+            "🌾 खेती-किसानी के नए तौर-तरीकों के लिए 'किसान बदलेगा' चैनल को अभी सब्सक्राइब करें!\n"
+            "जय जवान, जय किसान! 🚜\n\n"
+            "#KisanBadlega #KhetiBadi #IndianAgriculture #Kisan #ModernFarming #FarmingTips #PMKisan #KisanSammanNidhi #OrganicFarming #KrishiDarshan"
         ),
         "tags": [
-            "Kisan Badlega",
-            "kheti",
-            "kisan",
-            "agriculture",
-            "kheti badi",
-            "modern farming",
-            "pm kisan"
-        ]
+            "Kisan Badlega", "kheti", "kisan", "agriculture", "kheti badi",
+            "modern farming", "farming in india", "gehu ki kheti", "tamatar ki kheti",
+            "kisan samman nidhi", "pm kisan", "organic farming", "drip irrigation",
+            "krishi yojana", "mandi bhav today", "crop insurance", "smart farming"
+        ],
+        "thumb_headline": "खेती में 3 गुना मुनाफा!",
+        "thumb_subheadline": "कम लागत में बंपर पैदावार की गारंटी!",
+        "crop_name": "आधुनिक खेती",
+        "key_benefit": "3 गुना पैदावार गारंटी!",
+        "thumb_points": ["कम लागत", "3 गुना मुनाफा", "सरकारी सब्सिडी"]
     }
 
 def download_drive_video(drive_url: str, dest_dir: str) -> list:
