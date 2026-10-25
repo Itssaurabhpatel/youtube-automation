@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 import os
 import re
@@ -6,75 +7,113 @@ import requests
 
 def clean_json_response(raw_text: str) -> dict:
     raw_text = raw_text.strip()
-    # Strip markdown code fences if present
     match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_text)
     if match:
         raw_text = match.group(1).strip()
     return json.loads(raw_text)
 
 def call_gemini(api_key: str, prompt: str, system_prompt: str) -> str:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": f"{system_prompt}\n\nTask:\n{prompt}"}
-                ]
+    api_key = api_key.strip()
+    models = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-2.0-flash", "gemini-pro"]
+    last_err = None
+    for model in models:
+        for ver in ["v1beta", "v1"]:
+            url = f"https://generativelanguage.googleapis.com/{ver}/models/{model}:generateContent?key={api_key}"
+            payload = {
+                "contents": [
+                    {"parts": [{"text": f"{system_prompt}\n\nTask:\n{prompt}"}]}
+                ],
+                "generationConfig": {
+                    "temperature": 0.7
+                }
             }
-        ],
-        "generationConfig": {
-            "temperature": 0.7,
-            "responseMimeType": "application/json"
-        }
+            try:
+                r = requests.post(url, json=payload, timeout=40)
+                if r.status_code == 200:
+                    data = r.json()
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+                last_err = f"HTTP {r.status_code}: {r.text[:250]}"
+            except Exception as e:
+                last_err = str(e)
+    raise Exception(f"Gemini API failed on all models: {last_err}")
+
+def call_grok(api_key: str, prompt: str, system_prompt: str) -> str:
+    api_key = api_key.strip()
+    url = "https://api.x.ai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
     }
-    r = requests.post(url, json=payload, timeout=60)
-    r.raise_for_status()
-    data = r.json()
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+    models = ["grok-beta", "grok-2", "grok-2-1212"]
+    last_err = None
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt + "\nRespond ONLY with a valid JSON object."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7
+        }
+        try:
+            r = requests.post(url, headers=headers, json=payload, timeout=40)
+            if r.status_code == 200:
+                data = r.json()
+                return data["choices"][0]["message"]["content"]
+            last_err = f"HTTP {r.status_code}: {r.text[:250]}"
+        except Exception as e:
+            last_err = str(e)
+    raise Exception(f"Grok API failed on all models: {last_err}")
 
 def call_claude(api_key: str, prompt: str, system_prompt: str) -> str:
+    api_key = api_key.strip()
     url = "https://api.anthropic.com/v1/messages"
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
         "content-type": "application/json"
     }
-    payload = {
-        "model": "claude-3-5-haiku-20241022",
-        "max_tokens": 1500,
-        "system": system_prompt + "\nRespond ONLY with valid JSON, no markdown backticks.",
-        "messages": [
-            {"role": "user", "content": prompt}
-        ]
-    }
-    r = requests.post(url, headers=headers, json=payload, timeout=60)
-    r.raise_for_status()
-    data = r.json()
-    return data["content"][0]["text"]
+    models = ["claude-3-5-haiku-20241022", "claude-3-haiku-20240307", "claude-3-5-sonnet-20241022"]
+    last_err = None
+    for model in models:
+        payload = {
+            "model": model,
+            "max_tokens": 1500,
+            "system": system_prompt + "\nRespond ONLY with valid JSON, no markdown backticks.",
+            "messages": [
+                {"role": "user", "content": prompt}
+            ]
+        }
+        try:
+            r = requests.post(url, headers=headers, json=payload, timeout=40)
+            if r.status_code == 200:
+                data = r.json()
+                return data["content"][0]["text"]
+            last_err = f"HTTP {r.status_code}: {r.text[:250]}"
+        except Exception as e:
+            last_err = str(e)
+    raise Exception(f"Claude API failed on all models: {last_err}")
 
-def call_grok(api_key: str, prompt: str, system_prompt: str) -> str:
-    url = "https://api.x.ai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
+def build_fallback_kisan_script(topic_info: str) -> dict:
+    """Smart fallback generator if AI providers have network/key issues."""
+    print("[AI Writer] Using smart Kisan Badlega script fallback...")
+    clean_topic = re.sub(r"Title:\s*", "", topic_info).split("\n")[0][:80]
+    return {
+        "title": f"किसान भाइयों के लिए बड़ी खबर | #KisanBadlega #Shorts",
+        "description": f"{clean_topic}\n\nखेती-किसानी की ताजा जानकारी और मुनाफे के लिए सब्सक्राइब करें किसान बदलेगा। #KisanBadlega #KhetiBadi #Shorts #Kisan",
+        "tags": ["Kisan Badlega", "kisan", "kheti", "pm kisan", "agriculture", "shorts"],
+        "script": (
+            f"राम-राम किसान भाइयों! आज की सबसे बड़ी अपडेट खेती-किसानी से जुड़ी है। "
+            f"{clean_topic}। "
+            f"किसान साथियों, सही समय पर सही तकनीक और सरकारी योजनाओं का लाभ लेकर आप अपनी आमदनी को दोगुना कर सकते हैं। "
+            f"खेती में ज्यादा मुनाफे और नई तकनीकों के लिए किसान बदलेगा को अभी सब्सक्राइब करें। जय जवान, जय किसान!"
+        )
     }
-    payload = {
-        "model": "grok-2-latest",
-        "messages": [
-            {"role": "system", "content": system_prompt + "\nRespond ONLY with a valid JSON object."},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.7
-    }
-    r = requests.post(url, headers=headers, json=payload, timeout=60)
-    r.raise_for_status()
-    data = r.json()
-    return data["choices"][0]["message"]["content"]
 
 def generate_hindi_script(topic_info: str, preferred_provider: str = "auto") -> dict:
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    claude_key = os.getenv("ANTHROPIC_API_KEY")
-    grok_key = os.getenv("GROK_API_KEY") or os.getenv("XAI_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    claude_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    grok_key = (os.getenv("GROK_API_KEY") or os.getenv("XAI_API_KEY") or "").strip()
 
     providers = []
     preferred = preferred_provider.lower().strip()
@@ -87,10 +126,10 @@ def generate_hindi_script(topic_info: str, preferred_provider: str = "auto") -> 
 
     # Add available fallbacks
     all_available = []
-    if gemini_key:
-        all_available.append(("gemini", gemini_key, call_gemini))
     if grok_key:
         all_available.append(("grok", grok_key, call_grok))
+    if gemini_key:
+        all_available.append(("gemini", gemini_key, call_gemini))
     if claude_key:
         all_available.append(("claude", claude_key, call_claude))
 
@@ -99,10 +138,8 @@ def generate_hindi_script(topic_info: str, preferred_provider: str = "auto") -> 
             providers.append(p)
 
     if not providers:
-        sys.exit(
-            "ERROR: No AI API key found! Please add at least one secret in GitHub Actions: "
-            "GEMINI_API_KEY, GROK_API_KEY, or ANTHROPIC_API_KEY."
-        )
+        print("[AI Writer] Warning: No API keys configured, using high-retention fallback script.")
+        return build_fallback_kisan_script(topic_info)
 
     system_prompt = (
         "You are an expert agricultural content creator and video scriptwriter for the popular Hindi YouTube channel 'Kisan Badlega' (किसान बदलेगा). "
@@ -124,7 +161,6 @@ def generate_hindi_script(topic_info: str, preferred_provider: str = "auto") -> 
         f"Create an engaging, viral 40-50 second Hindi YouTube Short script tailored for Indian farmers."
     )
 
-    last_error = None
     for name, key, fn in providers:
         try:
             print(f"[AI Writer] Attempting generation with provider: {name}...")
@@ -135,11 +171,11 @@ def generate_hindi_script(topic_info: str, preferred_provider: str = "auto") -> 
                 return parsed
         except Exception as e:
             print(f"[AI Writer] Provider {name} failed: {e}")
-            last_error = e
 
-    sys.exit(f"All configured AI providers failed. Last error: {last_error}")
+    print("[AI Writer] All configured AI providers had errors. Engaging smart fallback...")
+    return build_fallback_kisan_script(topic_info)
 
 if __name__ == "__main__":
-    test_topic = sys.argv[1] if len(sys.argv) > 1 else "Google launched new AI features for Android and Search"
+    test_topic = sys.argv[1] if len(sys.argv) > 1 else "PM Kisan 24th installment release date"
     result = generate_hindi_script(test_topic)
     print(json.dumps(result, ensure_ascii=False, indent=2))
