@@ -105,25 +105,23 @@ def generate_hindi_script(topic_info: str, preferred_provider: str = "auto") -> 
         )
 
     system_prompt = (
-        "You are an expert YouTube Shorts and Reels content creator who writes viral, high-retention Hindi scripts. "
-        "Your tone is energetic, engaging, informative, and natural. "
+        "You are an expert agricultural content creator and video scriptwriter for the popular Hindi YouTube channel 'Kisan Badlega' (किसान बदलेगा). "
+        "Target Audience: Indian farmers (किसान भाई), agri-entrepreneurs, and rural youth interested in modern, profitable farming. "
+        "Tone: Respectful, energetic, motivating, and practical (देसी और आदरपूर्ण लहज़ा, e.g., 'राम-राम किसान भाइयों!', 'किसान साथियों!'). "
+        "Core Niches: Modern farming techniques (ड्रिप, पॉलीहाउस, जैविक खाद), high-profit crops (सब्जी, बागवानी, कम लागत ज्यादा मुनाफा), government subsidies (PM Kisan, सब्सिडी योजना), farm machinery, and Mandi updates. "
         "You must output ONLY a valid JSON object with the following keys:\n"
         "{\n"
-        '  "title": "Catchy Hindi / Hinglish YouTube Shorts title with #Shorts (under 70 chars)",\n'
-        '  "description": "Engaging description with key takeaways and trending hashtags #Shorts #Tech #AI",\n'
-        '  "tags": ["AI", "TechNews", "Hindi", "Shorts"],\n'
-        '  "script": "The narration in pure spoken Hindi (Devanagari script). 80 to 120 words. No emojis, no sound effects [brackets], no speaker labels, no English script - only spoken Hindi text."\n'
+        '  "title": "Catchy Hindi / Hinglish YouTube Shorts title with #Shorts (under 70 chars, e.g. किसान भाई इस तकनीक से कमाएं लाखों | #Shorts)",\n'
+        '  "description": "Short Hindi description highlighting the tips, mentioning channel किसान बदलेगा, with hashtags #KisanBadlega #KhetiBadi #Shorts #Agriculture #Kisan",\n'
+        '  "tags": ["Kisan Badlega", "kisan", "kheti badi", "agriculture", "modern farming", "pm kisan", "shorts"],\n'
+        '  "script": "The narration in pure spoken Hindi (Devanagari script only). 85 to 110 words (about 40-45 seconds when spoken). Must start with a warm farmer greeting like \'राम-राम किसान भाइयों!\' or \'किसान साथियों!\' followed by an eye-opening hook. Explain 2-3 actionable, high-value farming tips or scheme details simply. End with: \'खेती में ज्यादा मुनाफे और नई तकनीकों के लिए किसान बदलेगा को अभी सब्सक्राइब करें। जय जवान, जय किसान!\' Absolutely NO emojis, NO brackets or sound effect cues [like music], NO English alphabet in the script - strictly spoken Hindi words only."\n'
         "}"
     )
 
     user_prompt = (
-        f"Create a viral 40-50 second YouTube Short script based on this topic / news information:\n\n"
-        f"{topic_info}\n\n"
-        f"Guidelines:\n"
-        f"1. Start with an irresistible 3-second hook in Hindi.\n"
-        f"2. Explain 2-3 mind-blowing points or updates simply.\n"
-        f"3. End with a quick call to subscribe.\n"
-        f"4. The 'script' field must contain ONLY words meant to be spoken aloud by the voice artist."
+        f"Channel: Kisan Badlega (किसान बदलेगा)\n"
+        f"Topic / Agriculture News:\n{topic_info}\n\n"
+        f"Create an engaging, viral 40-50 second Hindi YouTube Short script tailored for Indian farmers."
     )
 
     last_error = None

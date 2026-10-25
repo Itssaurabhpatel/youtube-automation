@@ -54,7 +54,7 @@ def generate_procedural_background(duration: float, output_bg: str):
     cmd = [
         "ffmpeg", "-y",
         "-f", "lavfi",
-        "-i", f"color=c=0x0a0f1d:s=720x1280:r=30:d={duration}",
+        "-i", f"color=c=0x0f281e:s=720x1280:r=30:d={duration}",
         "-f", "lavfi",
         "-i", f"cellauto=s=720x1280:r=15:rule=30:seed=1234:d={duration}",
         "-filter_complex",
@@ -69,7 +69,7 @@ def generate_procedural_background(duration: float, output_bg: str):
     simple_cmd = [
         "ffmpeg", "-y",
         "-f", "lavfi",
-        "-i", f"color=c=0x0d1117:s=720x1280:r=30:d={duration}",
+        "-i", f"color=c=0x132a13:s=720x1280:r=30:d={duration}",
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-pix_fmt", "yuv420p",
@@ -118,7 +118,7 @@ def build_short_video(
         # Audio visualizer overlay
         filter_complex = (
             f"[0:v]{sub_filter}[subbed];"
-            f"[1:a]showwaves=s=600x120:mode=line:colors=0x00f2fe|0x4facfe:r=30[waves];"
+            f"[1:a]showwaves=s=600x120:mode=line:colors=0x52b788|0xe9c46a:r=30[waves];"
             f"[subbed][waves]overlay=(W-w)/2:H-200:shortest=1[outv]"
         )
 

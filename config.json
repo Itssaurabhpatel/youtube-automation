@@ -1,17 +1,21 @@
 {
-  "domain": "AI tools and technology",
+  "channel_name": "Kisan Badlega",
+  "domain": "भारतीय कृषि, आधुनिक खेती, मुनाफा और सरकारी योजनाएं",
   "language": "Hindi",
-  "google_news_query": "AI tools OR artificial intelligence OR तकनीक",
+  "google_news_query": "खेती OR किसान OR 'PM Kisan' OR 'कृषि योजना' OR 'फसल' OR 'कृषि' OR 'जैविक खेती'",
   "region": "IN",
   "ai_provider": "auto",
   "voice": "hi-IN-MadhurNeural",
   "upload_privacy": "private",
   "category_id": "27",
   "default_tags": [
-    "technology",
-    "ai in hindi",
-    "hindi",
-    "shorts",
-    "ai news"
+    "Kisan Badlega",
+    "kisan",
+    "kheti",
+    "kheti badi",
+    "agriculture in india",
+    "farming tips",
+    "pm kisan",
+    "shorts"
   ]
 }

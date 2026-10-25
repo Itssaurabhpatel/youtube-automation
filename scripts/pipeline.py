@@ -23,7 +23,7 @@ def load_config() -> dict:
     return {}
 
 def fetch_trending_hindi_topic(cfg: dict) -> str:
-    query = cfg.get("google_news_query", "AI tools OR artificial intelligence OR तकनीक")
+    query = cfg.get("google_news_query", "खेती OR किसान OR 'PM Kisan' OR 'कृषि योजना' OR 'फसल' OR 'कृषि'")
     region = cfg.get("region", "IN")
     lang = "hi" if cfg.get("language", "Hindi").lower().startswith("hindi") else "en"
     
@@ -31,10 +31,13 @@ def fetch_trending_hindi_topic(cfg: dict) -> str:
         "https://news.google.com/rss/search?q=" + quote_plus(query)
         + "&hl=" + lang + "&gl=" + region + "&ceid=" + region + ":" + lang
     )
-    print(f"[Pipeline] Fetching top Hindi news from: {url}")
+    print(f"[Pipeline] Fetching top Hindi Agriculture news from: {url}")
     feed = feedparser.parse(url)
     if not feed.entries:
-        return "आर्टिफिशियल इंटेलिजेंस और नए टेक टूल्स के फायदे और लेटेस्ट फीचर्स"
+        return (
+            "कम लागत में लाखों का मुनाफा देने वाली आधुनिक खेती की तकनीकें, "
+            "ड्रिप सिंचाई पर 80% सरकारी सब्सिडी और जैविक खाद बनाने का आसान तरीका।"
+        )
 
     # Take the first entry
     first = feed.entries[0]
