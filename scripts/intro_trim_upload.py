@@ -39,7 +39,12 @@ def download_file(url_or_path: str, dest_path: str) -> str:
 
     print(f"[Download] Fetching file from: {url_or_path}")
     if "drive.google.com" in url_or_path:
-        gdown.download(url=url_or_path, output=dest_path, quiet=False, fuzzy=True)
+        match = re.search(r"/file/d/([a-zA-Z0-9_-]+)", url_or_path) or re.search(r"id=([a-zA-Z0-9_-]+)", url_or_path)
+        if match:
+            file_id = match.group(1)
+            gdown.download(id=file_id, output=dest_path, quiet=False)
+        else:
+            gdown.download(url=url_or_path, output=dest_path, quiet=False)
     else:
         import requests
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}

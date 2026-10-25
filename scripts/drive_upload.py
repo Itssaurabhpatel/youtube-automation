@@ -138,7 +138,11 @@ def download_drive_video(drive_url: str, dest_dir: str) -> list:
         gdown.download_folder(url=drive_url, output=dest_dir, quiet=False, use_cookies=False)
     else:
         output_file = os.path.join(dest_dir, "drive_video.mp4")
-        gdown.download(url=drive_url, output=output_file, quiet=False, fuzzy=True)
+        match = re.search(r"/file/d/([a-zA-Z0-9_-]+)", drive_url) or re.search(r"id=([a-zA-Z0-9_-]+)", drive_url)
+        if match:
+            gdown.download(id=match.group(1), output=output_file, quiet=False)
+        else:
+            gdown.download(url=drive_url, output=output_file, quiet=False)
 
     # Gather all video files found
     exts = ("*.mp4", "*.mkv", "*.mov", "*.webm", "*.avi")
